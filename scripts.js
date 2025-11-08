@@ -9,6 +9,8 @@ let pollData = {
   'interstellar-probe': 0,
   'space-telescope': 0
 };
+let hasVoted = false;
+let scrollTimeout, resizeTimeout;
 
 // ===== SPACE DATA =====
 const spaceFacts = [
@@ -119,7 +121,13 @@ function initializeAnimations() {
 
 function initializeParticleField() {
   const particleField = document.getElementById('particle-field');
-  const particleCount = 50;
+  
+  // Reduce particle count on mobile for better performance
+  const isMobile = window.innerWidth <= 768;
+  const particleCount = isMobile ? 25 : 50;
+  
+  // Use DocumentFragment for better performance
+  const fragment = document.createDocumentFragment();
   
   for (let i = 0; i < particleCount; i++) {
     const particle = document.createElement('div');
@@ -127,8 +135,10 @@ function initializeParticleField() {
     particle.style.left = Math.random() * 100 + '%';
     particle.style.animationDelay = Math.random() * 15 + 's';
     particle.style.animationDuration = (15 + Math.random() * 10) + 's';
-    particleField.appendChild(particle);
+    fragment.appendChild(particle);
   }
+  
+  particleField.appendChild(fragment);
 }
 
 function initializeShootingStars() {
@@ -152,13 +162,30 @@ function initializeShootingStars() {
     }, 4000);
   }
   
-  // Create shooting stars at random intervals
-  setInterval(createShootingStar, 3000 + Math.random() * 5000);
+  // Use requestAnimationFrame for better performance
+  let shootingStarInterval;
   
-  // Create initial shooting stars
-  for (let i = 0; i < 3; i++) {
-    setTimeout(createShootingStar, i * 2000);
+  function startShootingStars() {
+    // Create shooting stars at random intervals
+    shootingStarInterval = setInterval(createShootingStar, 3000 + Math.random() * 5000);
+    
+    // Create initial shooting stars
+    for (let i = 0; i < 3; i++) {
+      setTimeout(createShootingStar, i * 2000);
+    }
   }
+  
+  // Start shooting stars after page load for better performance
+  setTimeout(startShootingStars, 2000);
+  
+  // Stop shooting stars when page is hidden (battery optimization)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clearInterval(shootingStarInterval);
+    } else {
+      startShootingStars();
+    }
+  });
 }
 
 // ===== UTILITY FUNCTIONS =====
@@ -177,28 +204,36 @@ function scrollToSection(sectionId) {
 }
 
 function handleScrollAnimations() {
-  // Add parallax effect to background elements
-  const scrolled = window.pageYOffset;
-  const parallax = document.getElementById('nebula-background');
-  if (parallax) {
-    parallax.style.transform = `translateY(${scrolled * 0.5}px)`;
-  }
+  // Debounced scroll handler for better performance
+  clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    // Add parallax effect to background elements
+    const scrolled = window.pageYOffset;
+    const parallax = document.getElementById('nebula-background');
+    if (parallax) {
+      parallax.style.transform = `translateY(${scrolled * 0.5}px)`;
+    }
+  }, 10);
 }
 
 function handleResize() {
-  // Resize canvas elements when window is resized
-  const canvases = document.querySelectorAll('canvas');
-  canvases.forEach(canvas => {
-    if (canvas.id === 'scenario-canvas') {
-      drawScenarioVisualization();
-    } else if (canvas.id === 'orbit-canvas') {
-      drawOrbitSimulation();
-    } else if (canvas.id === 'gravity-canvas') {
-      drawGravitySimulation();
-    } else if (canvas.id === 'solar-canvas') {
-      drawSolarSimulation();
-    }
-  });
+  // Debounced resize handler for better performance
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    // Resize canvas elements when window is resized
+    const canvases = document.querySelectorAll('canvas');
+    canvases.forEach(canvas => {
+      if (canvas.id === 'scenario-canvas') {
+        drawScenarioVisualization();
+      } else if (canvas.id === 'orbit-canvas') {
+        drawOrbitSimulation();
+      } else if (canvas.id === 'gravity-canvas') {
+        drawGravitySimulation();
+      } else if (canvas.id === 'solar-canvas') {
+        drawSolarSimulation();
+      }
+    });
+  }, 250);
 }
 
 // ===== DAILY WHAT IF FUNCTIONS =====
@@ -286,6 +321,9 @@ function loadSpaceFact() {
   const today = new Date().getDay();
   const fact = spaceFacts[today % spaceFacts.length];
   document.getElementById('daily-fact').textContent = fact;
+  
+  // Initialize drag functionality
+  initializeFactDraggable();
 }
 
 function refreshSpaceFact() {
@@ -299,6 +337,109 @@ function refreshSpaceFact() {
     factElement.textContent = randomFact;
     factElement.style.opacity = '1';
   }, 300);
+}
+
+function initializeFactDraggable() {
+  const factCard = document.querySelector('.space-fact-sidebar');
+  if (!factCard) return;
+  
+  let isDragging = false;
+  let currentX;
+  let currentY;
+  let initialX;
+  let initialY;
+  let xOffset = 0;
+  let yOffset = 0;
+  
+  const dragHandle = factCard.querySelector('.drag-handle');
+  const closeBtn = factCard.querySelector('.close-fact');
+  const refreshBtn = factCard.querySelector('.refresh-fact');
+  
+  // Close button functionality
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      factCard.classList.add('hidden');
+      // Store preference in localStorage
+      localStorage.setItem('spaceFactHidden', 'true');
+    });
+  }
+  
+  // Refresh button functionality
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', refreshSpaceFact);
+  }
+  
+  // Check if user previously closed the fact card
+  if (localStorage.getItem('spaceFactHidden') === 'true') {
+    factCard.classList.add('hidden');
+  }
+  
+  // Drag functionality
+  if (dragHandle) {
+    dragHandle.addEventListener('mousedown', dragStart);
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', dragEnd);
+    
+    // Touch events for mobile
+    dragHandle.addEventListener('touchstart', dragStart);
+    document.addEventListener('touchmove', drag);
+    document.addEventListener('touchend', dragEnd);
+  }
+  
+  function dragStart(e) {
+    if (e.type === 'touchstart') {
+      initialX = e.touches[0].clientX - xOffset;
+      initialY = e.touches[0].clientY - yOffset;
+    } else {
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+    }
+    
+    if (e.target === dragHandle || dragHandle.contains(e.target)) {
+      isDragging = true;
+      factCard.classList.add('dragging');
+    }
+  }
+  
+  function drag(e) {
+    if (isDragging) {
+      e.preventDefault();
+      
+      if (e.type === 'touchmove') {
+        currentX = e.touches[0].clientX - initialX;
+        currentY = e.touches[0].clientY - initialY;
+      } else {
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+      }
+      
+      xOffset = currentX;
+      yOffset = currentY;
+      
+      factCard.style.transform = `translate(${currentX}px, ${currentY}px)`;
+    }
+  }
+  
+  function dragEnd(e) {
+    initialX = currentX;
+    initialY = currentY;
+    isDragging = false;
+    factCard.classList.remove('dragging');
+    
+    // Save position to localStorage
+    localStorage.setItem('spaceFactPosition', JSON.stringify({ x: currentX, y: currentY }));
+  }
+  
+  // Load saved position
+  const savedPosition = localStorage.getItem('spaceFactPosition');
+  if (savedPosition) {
+    const pos = JSON.parse(savedPosition);
+    xOffset = pos.x;
+    yOffset = pos.y;
+    currentX = pos.x;
+    currentY = pos.y;
+    factCard.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+  }
 }
 
 // ===== SIMULATION FUNCTIONS =====
@@ -493,9 +634,22 @@ function initializePoll() {
     pollData = JSON.parse(savedData);
     updatePollDisplay();
   }
+  
+  // Check if user has already voted in this session
+  const sessionVoted = sessionStorage.getItem('hasVoted');
+  if (sessionVoted === 'true') {
+    hasVoted = true;
+    disablePollVoting();
+    showPollResults();
+  }
 }
 
 function submitPoll() {
+  if (hasVoted) {
+    alert('You have already voted in this session!');
+    return;
+  }
+  
   const selectedOption = document.querySelector('input[name="poll"]:checked');
   if (!selectedOption) {
     alert('Please select an option before voting!');
@@ -505,8 +659,12 @@ function submitPoll() {
   // Increment vote count
   pollData[selectedOption.value]++;
   
-  // Save to localStorage
+  // Save to localStorage (persistent across sessions)
   localStorage.setItem('pollData', JSON.stringify(pollData));
+  
+  // Mark as voted in session storage
+  hasVoted = true;
+  sessionStorage.setItem('hasVoted', 'true');
   
   // Update display
   updatePollDisplay();
@@ -515,9 +673,29 @@ function submitPoll() {
   showPollResults();
   
   // Disable voting
-  document.getElementById('poll-submit').disabled = true;
+  disablePollVoting();
+  
+  // Announce to screen readers
+  if (window.announceToScreenReader) {
+    window.announceToScreenReader('Vote submitted successfully!');
+  }
+}
+
+function disablePollVoting() {
+  const submitButton = document.getElementById('poll-submit');
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Vote Submitted';
+    submitButton.classList.add('voted');
+  }
+  
   document.querySelectorAll('.poll-input').forEach(input => {
     input.disabled = true;
+  });
+  
+  document.querySelectorAll('.poll-label').forEach(label => {
+    label.style.cursor = 'not-allowed';
+    label.style.opacity = '0.7';
   });
 }
 
@@ -528,8 +706,14 @@ function updatePollDisplay() {
     const optionKey = ['mars-mission', 'europa-explorer', 'interstellar-probe', 'space-telescope'][i-1];
     const countElement = document.getElementById(`count-${i}`);
     if (countElement) {
-      countElement.textContent = `${pollData[optionKey]} votes`;
+      countElement.textContent = `${pollData[optionKey]} vote${pollData[optionKey] !== 1 ? 's' : ''}`;
     }
+  }
+  
+  // Update total votes display
+  const totalElement = document.querySelector('.poll-total-votes');
+  if (totalElement) {
+    totalElement.textContent = `${totalVotes} total vote${totalVotes !== 1 ? 's' : ''}`;
   }
 }
 

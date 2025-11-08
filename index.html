@@ -109,9 +109,23 @@
         </section>
 
         <!-- Space Fact of the Day -->
-        <aside id="space-fact" class="space-fact-sidebar" role="complementary" aria-labelledby="fact-title">
+        <aside id="space-fact" class="space-fact-sidebar" role="complementary" aria-labelledby="fact-title" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
             <div class="fact-card">
-                <h3 id="fact-title" class="fact-title">Space Fact of the Day</h3>
+                <div class="fact-header">
+                    <h3 id="fact-title" class="fact-title">Space Fact of the Day</h3>
+                    <div class="fact-controls">
+                        <button class="fact-control-btn" aria-label="Refresh space fact" onclick="refreshSpaceFact()" title="Refresh fact">
+                            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="M8 2 V6 L12 4 M8 14 V10 L4 12" stroke="currentColor" stroke-width="2" fill="none"/>
+                            </svg>
+                        </button>
+                        <button class="fact-control-btn" aria-label="Close space fact" onclick="closeSpaceFact()" title="Close">
+                            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="M2 2 L14 14 M14 2 L2 14" stroke="currentColor" stroke-width="2" fill="none"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
                 <div class="fact-content">
                     <div class="fact-icon">
                         <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
@@ -122,9 +136,14 @@
                     <p class="fact-text" id="daily-fact">A day on Venus (243 Earth days) is longer than its year (225 Earth days).</p>
                     <div class="fact-meta">
                         <span class="fact-category">Planetary Science</span>
-                        <button class="refresh-fact" aria-label="Get new space fact" onclick="refreshSpaceFact()">
+                        <button class="drag-handle" aria-label="Drag space fact card" onmousedown="startDrag(event)" title="Drag to move">
                             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                                <path d="M8 2 V6 L12 4 M8 14 V10 L4 12" stroke="currentColor" stroke-width="2" fill="none"/>
+                                <circle cx="4" cy="4" r="1" fill="currentColor"/>
+                                <circle cx="4" cy="8" r="1" fill="currentColor"/>
+                                <circle cx="4" cy="12" r="1" fill="currentColor"/>
+                                <circle cx="12" cy="4" r="1" fill="currentColor"/>
+                                <circle cx="12" cy="8" r="1" fill="currentColor"/>
+                                <circle cx="12" cy="12" r="1" fill="currentColor"/>
                             </svg>
                         </button>
                     </div>
